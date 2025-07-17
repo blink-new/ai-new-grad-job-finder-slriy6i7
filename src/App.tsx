@@ -41,18 +41,14 @@ function App() {
 
     const loadSavedJobs = async () => {
       try {
-        // Try to load from database first
-        const saved = await blink.db.savedJobs.list({
-          where: { userId: user.id }
-        })
-        setSavedJobs(saved.map(job => job.jobId))
-      } catch (error) {
-        console.error('Error loading saved jobs:', error)
-        // Fallback to localStorage if database is not available
+        // Load from localStorage (primary storage for now)
         const localSaved = localStorage.getItem(`savedJobs_${user.id}`)
         if (localSaved) {
           setSavedJobs(JSON.parse(localSaved))
         }
+      } catch (error) {
+        console.error('Error loading saved jobs:', error)
+        setSavedJobs([])
       }
     }
 
@@ -143,26 +139,11 @@ function App() {
     try {
       if (savedJobs.includes(jobId)) {
         // Remove from saved
-        try {
-          await blink.db.savedJobs.delete(jobId)
-        } catch (dbError) {
-          console.log('Database not available, using localStorage')
-        }
         const newSavedJobs = savedJobs.filter(id => id !== jobId)
         setSavedJobs(newSavedJobs)
         localStorage.setItem(`savedJobs_${user.id}`, JSON.stringify(newSavedJobs))
       } else {
         // Add to saved
-        try {
-          await blink.db.savedJobs.create({
-            id: `saved_${Date.now()}`,
-            userId: user.id,
-            jobId: jobId,
-            createdAt: new Date().toISOString()
-          })
-        } catch (dbError) {
-          console.log('Database not available, using localStorage')
-        }
         const newSavedJobs = [...savedJobs, jobId]
         setSavedJobs(newSavedJobs)
         localStorage.setItem(`savedJobs_${user.id}`, JSON.stringify(newSavedJobs))
