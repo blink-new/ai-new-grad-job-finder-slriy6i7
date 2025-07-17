@@ -41,12 +41,18 @@ function App() {
 
     const loadSavedJobs = async () => {
       try {
+        // Try to load from database first
         const saved = await blink.db.savedJobs.list({
           where: { userId: user.id }
         })
         setSavedJobs(saved.map(job => job.jobId))
       } catch (error) {
         console.error('Error loading saved jobs:', error)
+        // Fallback to localStorage if database is not available
+        const localSaved = localStorage.getItem(`savedJobs_${user.id}`)
+        if (localSaved) {
+          setSavedJobs(JSON.parse(localSaved))
+        }
       }
     }
 
@@ -137,17 +143,29 @@ function App() {
     try {
       if (savedJobs.includes(jobId)) {
         // Remove from saved
-        await blink.db.savedJobs.delete(jobId)
-        setSavedJobs(prev => prev.filter(id => id !== jobId))
+        try {
+          await blink.db.savedJobs.delete(jobId)
+        } catch (dbError) {
+          console.log('Database not available, using localStorage')
+        }
+        const newSavedJobs = savedJobs.filter(id => id !== jobId)
+        setSavedJobs(newSavedJobs)
+        localStorage.setItem(`savedJobs_${user.id}`, JSON.stringify(newSavedJobs))
       } else {
         // Add to saved
-        await blink.db.savedJobs.create({
-          id: `saved_${Date.now()}`,
-          userId: user.id,
-          jobId: jobId,
-          createdAt: new Date().toISOString()
-        })
-        setSavedJobs(prev => [...prev, jobId])
+        try {
+          await blink.db.savedJobs.create({
+            id: `saved_${Date.now()}`,
+            userId: user.id,
+            jobId: jobId,
+            createdAt: new Date().toISOString()
+          })
+        } catch (dbError) {
+          console.log('Database not available, using localStorage')
+        }
+        const newSavedJobs = [...savedJobs, jobId]
+        setSavedJobs(newSavedJobs)
+        localStorage.setItem(`savedJobs_${user.id}`, JSON.stringify(newSavedJobs))
       }
     } catch (error) {
       console.error('Error toggling saved job:', error)
